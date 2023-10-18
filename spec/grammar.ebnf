@@ -1,0 +1,267 @@
+(*
+  Modules
+*)
+
+module = [ import-block ], { function-definition };
+
+(*
+  Keywords
+*)
+
+import-keyword = "using";
+from-keyword = "from";
+as-keyword = "as";
+
+function-keyword = "function";
+return-keyword = "return";
+
+struct-keyword = "struct";
+enum-keyword = "enum";
+
+var-keyword = "var";
+
+if-keyword = "if";
+else-keyword = "else";
+
+for-keyword = "for";
+in-keyword = "in";
+while-keyword = "while";
+
+(*
+  Import block
+*)
+
+import-block = import-keyword, open-brace, { import-statement }, close-brace;
+
+import-statement = identifier, [ as-keyword, identifier, ], from-keyword, identifier, newline;
+
+
+(*
+  Function definition
+*)
+
+function-definition = function-keyword, identifier, parameter-list, [ return-type ], function-body;
+
+parameter-list = open-paren, parameters, close-paren;
+parameters = [ parameter, { ",", parameter } ];
+parameter = base-identifier, ":", type;
+
+return-type = ":", type;
+
+function-body = open-brace, { statement }, close-brace;
+
+(*
+  Struct definition
+*)
+(*TODO*)
+
+(*
+  Types
+*)
+
+type = identifier;
+
+
+(*
+  Identifiers
+*)
+
+base-identifier = letter-or-underscore, { alphanumeric-or-underscore };
+identifier = base-identifier, { dot, base-identifier };
+
+
+(*
+  Statements
+*)
+
+code-block = { statement | comment };
+
+statement = [ assignment-statement | const-declaration | var-declaration | return-statement | expression ], newline;
+
+assignment-statement = identifier, assignment-operator, expression;
+const-declaration = identifier, ":", type, "=", expression;
+var-declaration = var-keyword, identifier, ":", type, [ "=", expression ];
+return-statement = return-keyword, expression;
+
+
+
+(*
+  Literals
+*)
+
+literal = number_literal | character-literal | string-literal | boolean-literal | none-literal;
+
+
+(* Numeric literals *)
+number_literal = integer-literal | float-literal;
+
+integer-literal = digit, { digit | underscore };
+float-literal = integer-literal, dot, integer-literal;
+
+(* String literals *)
+character-literal = single-quote, unicode-character, single-quote;
+string-literal = double-quote, { unicode-character }, double-quote;
+
+(* Boolean literals *)
+boolean-literal = "true" | "false";
+
+(* None literal *)
+none-literal = "None";
+
+
+(*
+  Comments
+*)
+
+comment = inline-comment | multi-line-comment;
+
+inline-comment = "#", { unicode-character }, "\n";
+multi-line-comment = "/*", {unicode-character}, "*/";
+
+
+(*
+  Expressions
+*)
+
+expression = logical-or-term, [ ternary-operator-condition, expression, ternary-operator-alternative, expression ];
+
+logical-or-term = logical-and-term, { logical-or-operator, logical-and-term };
+logical-and-term = bitwise-or-term, { logical-and-operator, bitwise-or-term };
+bitwise-or-term = bitwise-xor-term, { bitwise-or-operator, bitwise-xor-term };
+bitwise-xor-term = bitwise-and-term, { bitwise-xor-operator, bitwise-and-term };
+bitwise-and-term = equality-term, { bitwise-and-operator, equality-term };
+equality-term = relation-term, { equal-operator | not-equal-operator, relation-term };
+relation-term = shift-term, { relational-operator, shift-term };
+shift-term = sum-term, { bitwise-left-shift-operator | bitwise-right-shift-operator, sum-term };
+sum-term = factor-term, { addition-operator | subtraction-operator, factor-term };
+factor-term = unary-term, { multiplication-operator | division-operator | left-division-operator | modulo-operator, unary-term };
+unary-term = [ unary-operator ], power-term;
+power-term = atomic-expression, { exponentiation-operator, atomic-expression };
+
+atomic-expression = literal | identifier | function-call | parenthesized-expression | array | index-expression;
+
+function-call = identifier, "(", [ expression, { ",", expression } ], ")";
+parenthesized-expression = "(", expression, ")";
+
+
+(*
+  Operators
+*)
+
+(* Unary operators *)
+unary-operator = negation-operator | logical-not-operator | bitwise-not-operator;
+
+negation-operator = "-";
+logical-not-operator = "!";
+bitwise-not-operator = "~";
+
+
+(* Arithmetic operators *)
+arithmetic-operator =
+	  addition-operator | subtraction-operator | multiplication-operator |
+  	division-operator | left-division-operator | modulo-operator | exponentiation-operator;
+
+addition-operator = "+";
+subtraction-operator = "-";
+multiplication-operator = "*";
+division-operator = "/";
+left-division-operator = "\\";
+modulo-operator = "%";
+exponentiation-operator = "**";
+
+(* Logical operators *)
+logical-operator = logical-and-operator | logical-or-operator ;
+
+logical-and-operator = "&&";
+logical-or-operator = "||";
+
+(* Bitwise operators *)
+bitwise-operator = bitwise-and-operator | bitwise-or-operator | bitwise-xor-operator |
+  	bitwise-left-shift-operator | bitwise-right-shift-operator;
+
+bitwise-and-operator = "&";
+bitwise-or-operator = "|";
+bitwise-xor-operator = "^";
+bitwise-left-shift-operator = "<<";
+bitwise-right-shift-operator = ">>";
+
+(* Relational operators *)
+relational-operator =
+	equal-operator | not-equal-operator | less-than-operator | greater-than-operator |
+	less-than-or-equal-operator | greater-than-or-equal-operator;
+
+equal-operator = "==";
+not-equal-operator = "!=";
+less-than-operator = "<";
+greater-than-operator = ">";
+less-than-or-equal-operator = "<=";
+greater-than-or-equal-operator = ">=";
+
+(* Binary operators *)
+binary-operator = arithmetic-operator | logical-operator | bitwise-operator | relational-operator;
+
+(* Ternary operator *)
+ternary-operator-condition = "?";
+ternary-operator-alternative = ":";
+
+(* Assignment operators *)
+assignment-operator = direct-assignment-operator | binary-assignment-operator;
+
+direct-assignment-operator = "=";
+binary-assignment-operator = binary-operator, "=";
+
+
+(*
+  Sequence types
+*)
+
+array = "[", [ expression, { ",", expression } ], "]";
+
+index-expression = expression, ( index | slice );
+
+index = "[", expression, "]";
+slice = "[", [ expression ], ":", [ expression ], "]";
+
+
+(* Basic tokens *)
+
+alphanumeric = digit | letter;
+alphanumeric-or-underscore = alphanumeric | underscore;
+
+letter = lower-case-letter | upper-case-letter;
+letter-or-underscore = letter | underscore;
+
+whitespace = whitespace_character, { whitespace_character };
+whitespace_character = ' ' | '\t' | '\n' | '\r' | '\f';
+
+open-paren = "(";
+close-paren = ")";
+
+open-bracket = "[";
+close-bracket = "]";
+
+open-brace = "{";
+close-brace = "}";
+
+single-quote = "'";
+double-quote = '"';
+
+dot = ".";
+
+list-separator = ",";
+
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+lower-case-letter =
+    "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" |
+    "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z";
+upper-case-letter =
+    "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" |
+    "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z";
+underscore = "_";
+newline = "\n";
+
+unicode-character = #'[\u0020-\uD7FF\uE000-\uFFFD\U00010000-\U0010FFFF]';
+
+
+
+
