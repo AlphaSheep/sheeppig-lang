@@ -15,8 +15,8 @@ pub fn tokenize(source_code: &str) -> Vec<Token> {
             ')' => tokens.push(Token::CloseParen),
             '{' => tokens.push(Token::OpenBrace),
             '}' => tokens.push(Token::CloseBrace),
-            '[' => tokens.push(Token::OpenBracket),
-            ']' => tokens.push(Token::CloseBracket),
+            '[' => tokens.push(Token::OpenSquareBracket),
+            ']' => tokens.push(Token::CloseSquareBracket),
             ',' => tokens.push(Token::ListSeparator),
             ':' => tokens.push(Token::Colon),
 

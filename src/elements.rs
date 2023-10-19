@@ -4,6 +4,15 @@ pub enum Identifier {
     Compound(Vec<String>),
 }
 
+impl Identifier {
+    pub fn as_string(&self) -> String {
+        match self {
+            Identifier::Simple(name) => name.clone(),
+            Identifier::Compound(names) => names.join("."),
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {

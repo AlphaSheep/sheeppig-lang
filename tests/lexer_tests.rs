@@ -24,7 +24,6 @@ fn test_tokenise_hello_world() {
         Token::OpenParen,
         Token::CloseParen,
         Token::OpenBrace,
-        Token::Newline,
 
         Token::Identifier(Identifier::Simple("print".to_string())),
         Token::OpenParen,
@@ -59,7 +58,6 @@ fn test_tokenise_adding() {
         Token::Colon,
         Token::Identifier(Identifier::Simple("int".to_string())),
         Token::OpenBrace,
-        Token::Newline,
 
         Token::Keyword(Keyword::Return),
         Token::Identifier(Identifier::Simple("a".to_string())),
@@ -85,7 +83,6 @@ fn test_tokenise_conditional() {
         Token::OpenParen,
         Token::CloseParen,
         Token::OpenBrace,
-        Token::Newline,
 
         Token::Keyword(Keyword::Variable),
         Token::Identifier(Identifier::Simple("a".to_string())),
@@ -103,7 +100,6 @@ fn test_tokenise_conditional() {
         Token::Operator(Operator::LessThanOrEqual),
         Token::Literal(Literal::Integer(3)),
         Token::OpenBrace,
-        Token::Newline,
 
         Token::Identifier(Identifier::Simple("a".to_string())),
         Token::Assign,
@@ -115,7 +111,6 @@ fn test_tokenise_conditional() {
         Token::CloseBrace,
         Token::Keyword(Keyword::Else),
         Token::OpenBrace,
-        Token::Newline,
 
         Token::Identifier(Identifier::Simple("a".to_string())),
         Token::Assign,
@@ -146,24 +141,23 @@ fn test_tokenise_import() {
     let expected = vec![
         Token::Keyword(Keyword::Using),
         Token::OpenBrace,
-        Token::Newline,
 
         Token::Identifier(Identifier::Simple("sqrt".to_string())),
         Token::Keyword(Keyword::As),
         Token::Identifier(Identifier::Simple("square_root".to_string())),
         Token::Keyword(Keyword::From),
-        Token::Identifier(Identifier::Simple("math".to_string())),
-        Token::Dot,
-        Token::Identifier(Identifier::Simple("utils".to_string())),
+        Token::Identifier(Identifier::Compound(vec![
+            "math".to_string(), "utils".to_string()
+        ])),
         Token::Newline,
 
         Token::Identifier(Identifier::Simple("sin".to_string())),
         Token::ListSeparator,
         Token::Identifier(Identifier::Simple("cos".to_string())),
         Token::Keyword(Keyword::From),
-        Token::Identifier(Identifier::Simple("math".to_string())),
-        Token::Dot,
-        Token::Identifier(Identifier::Simple("trig".to_string())),
+        Token::Identifier(Identifier::Compound(vec![
+            "math".to_string(), "trig".to_string()
+        ])),
         Token::Newline,
 
         Token::CloseBrace,
@@ -174,7 +168,6 @@ fn test_tokenise_import() {
         Token::OpenParen,
         Token::CloseParen,
         Token::OpenBrace,
-        Token::Newline,
 
         Token::CloseBrace,
         Token::EndOfModule,
@@ -194,11 +187,10 @@ fn test_tokenise_arrays_and_numbers() {
         Token::OpenParen,
         Token::CloseParen,
         Token::OpenBrace,
-        Token::Newline,
 
         Token::Identifier(Identifier::Simple("array".to_string())),
         Token::Assign,
-        Token::OpenBracket,
+        Token::OpenSquareBracket,
         Token::Literal(Literal::Integer(1)),
         Token::ListSeparator,
         Token::Literal(Literal::Integer(23)),
@@ -216,7 +208,7 @@ fn test_tokenise_arrays_and_numbers() {
         Token::Literal(Literal::Float(0.000001)),
         Token::ListSeparator,
         Token::Literal(Literal::Float(1340000.0)),
-        Token::CloseBracket,
+        Token::CloseSquareBracket,
         Token::Newline,
 
         Token::CloseBrace,
@@ -237,7 +229,6 @@ fn test_tokenise_arithmetic() {
         Token::OpenParen,
         Token::CloseParen,
         Token::OpenBrace,
-        Token::Newline,
 
         Token::Identifier(Identifier::Simple("a".to_string())),
         Token::Assign,
@@ -358,7 +349,6 @@ fn test_tokenise_comments() {
         Token::OpenParen,
         Token::CloseParen,
         Token::OpenBrace,
-        Token::Newline,
 
         Token::Identifier(Identifier::Simple("a".to_string())),
         Token::Assign,
