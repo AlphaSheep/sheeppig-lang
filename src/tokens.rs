@@ -9,8 +9,8 @@ pub enum Token {
     CloseParen,
     OpenBrace,
     CloseBrace,
-    OpenBracket,
-    CloseBracket,
+    OpenSquareBracket,
+    CloseSquareBracket,
 
     ListSeparator,
     Dot,
