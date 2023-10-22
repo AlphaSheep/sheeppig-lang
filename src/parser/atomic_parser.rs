@@ -9,6 +9,7 @@ use crate::tree::{
 };
 
 use crate::parser::utils::{ handle_parse_error, handle_parse_error_for_option };
+use crate::parser::expression_parser::parse_expression;
 
 
 pub fn parse_atomic(tokens: &mut Peekable<Iter<Token>>) -> Expression {
@@ -40,12 +41,55 @@ pub fn parse_atomic(tokens: &mut Peekable<Iter<Token>>) -> Expression {
 
 
 fn parse_parenthesized(tokens: &mut Peekable<Iter<Token>>) -> ParenthesizedExpression {
-    panic!("Not implemented");
+    let expression = parse_expression(tokens);
+
+    match tokens.peek() {
+        Some(Token::CloseParen) => {
+            tokens.next()
+        },
+        _ => handle_parse_error_for_option("Expected closing parenthesis", tokens.peek()),
+    };
+    ParenthesizedExpression{ value: Box::new(expression) }
 }
 
 
 fn parse_function_call(identifier: &Identifier, tokens: &mut Peekable<Iter<Token>>) -> FunctionCallExpression {
-    panic!("Not implemented");
+    let parameters = parse_parameter_list(tokens);
+
+    FunctionCallExpression {
+        name: identifier.clone(),
+        parameters,
+    }
+}
+
+
+fn parse_parameter_list(tokens: &mut Peekable<Iter<Token>>) -> Vec<Expression> {
+    if let Some(token) = tokens.next() {
+        match token {
+            Token::OpenParen => {},
+            _ => handle_parse_error("Expected a parameter list starting with an open parenthesis", token),
+        }
+    }
+
+    let mut parameters = vec![];
+
+    while let Some(token) = tokens.peek() {
+        match token {
+            Token::Newline => {tokens.next();},
+            Token::ListSeparator => {
+                tokens.next();
+                if let Some(Token::ListSeparator) | Some(Token::CloseParen) = tokens.peek() {
+                    handle_parse_error_for_option::<()>("Expected a parameter", tokens.peek());
+                }
+            },
+            Token::CloseParen => {
+                tokens.next();
+                break;
+            }
+            _ => parameters.push(parse_expression(tokens)),
+        }
+    }
+    parameters
 }
 
 
