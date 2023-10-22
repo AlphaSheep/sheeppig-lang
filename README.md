@@ -1,6 +1,6 @@
 # SheepPig Lang
 
-A very simple statically typed functional language. This was written as an exercise in writing a compiler. It is not intended to be used for anything serious.
+A very simple statically typed functional language. This was written as an exercise in writing an interpreter. It is not intended to be used for anything serious.
 
 ![mascot](./assets/sheeppig.png)
 
