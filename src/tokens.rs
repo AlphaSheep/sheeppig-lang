@@ -23,6 +23,7 @@ pub enum Token {
     Operator(Operator),
     TernaryCondition,
     Assign,
+    BinaryAssign(Operator),
 
     Keyword(Keyword),
     Literal(Literal),

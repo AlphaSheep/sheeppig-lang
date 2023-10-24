@@ -28,23 +28,47 @@ pub fn tokenize(source_code: &str) -> Vec<Token> {
                 }
             },
 
-            '+' => tokens.push(Token::Operator(Operator::Plus)),
-            '-' => tokens.push(Token::Operator(Operator::Minus)),
+            '+' => {
+                if let Some('=') = chars.peek(){
+                    chars.next();
+                    tokens.push(Token::BinaryAssign(Operator::Plus));
+                } else {
+                    tokens.push(Token::Operator(Operator::Plus));
+                }
+            },
+
+            '-' => {
+                if let Some('=') = chars.peek(){
+                    chars.next();
+                    tokens.push(Token::BinaryAssign(Operator::Minus));
+                } else {
+                    tokens.push(Token::Operator(Operator::Minus));
+                }
+            },
+
             '*' => {
                 if let Some('*') = chars.peek() {
                     chars.next();
                     tokens.push(Token::Operator(Operator::Power));
+                } else if let Some('=') = chars.peek() {
+                    chars.next();
+                    tokens.push(Token::BinaryAssign(Operator::Times));
                 } else {
                     tokens.push(Token::Operator(Operator::Times));
                 }
             },
+
             '/' => {
                 if let Some('*') = chars.peek() {
                     eat_block_comment(&mut chars);
+                } else if let Some('=') = chars.peek() {
+                    chars.next();
+                    tokens.push(Token::BinaryAssign(Operator::Divide));
                 } else {
                     tokens.push(Token::Operator(Operator::Divide));
                 }
             },
+
             '\\' => {
                 if let Some('\n') | Some('\r') = chars.peek() {
                     eat_whitespace('\\', &mut chars, &mut tokens, false)
@@ -52,12 +76,23 @@ pub fn tokenize(source_code: &str) -> Vec<Token> {
                     panic!("Unexpected character: {}", c);
                 }
             },
-            '%' => tokens.push(Token::Operator(Operator::Modulo)),
+
+            '%' => {
+                if let Some('=') = chars.peek() {
+                    chars.next();
+                    tokens.push(Token::BinaryAssign(Operator::Modulo));
+                } else {
+                    tokens.push(Token::Operator(Operator::Modulo));
+                }
+            },
 
             '&' => {
                 if let Some('&') = chars.peek() {
                     chars.next();
                     tokens.push(Token::Operator(Operator::And));
+                } else if let Some('=') = chars.peek() {
+                    chars.next();
+                    tokens.push(Token::BinaryAssign(Operator::BitwiseAnd));
                 } else {
                     tokens.push(Token::Operator(Operator::BitwiseAnd));
                 }
@@ -67,13 +102,25 @@ pub fn tokenize(source_code: &str) -> Vec<Token> {
                 if let Some('|') = chars.peek() {
                     chars.next();
                     tokens.push(Token::Operator(Operator::Or));
+                } else if let Some('=') = chars.peek() {
+                    chars.next();
+                    tokens.push(Token::BinaryAssign(Operator::BitwiseOr));
                 } else {
                     tokens.push(Token::Operator(Operator::BitwiseOr));
                 }
             },
 
-            '^' => tokens.push(Token::Operator(Operator::BitwiseXor)),
+            '^' => {
+                if let Some('=') = chars.peek() {
+                    chars.next();
+                    tokens.push(Token::BinaryAssign(Operator::BitwiseXor));
+                } else {
+                    tokens.push(Token::Operator(Operator::BitwiseXor));
+                }
+            },
+
             '~' => tokens.push(Token::Operator(Operator::BitwiseNot)),
+
             '!' => {
                 if let Some('=') = chars.peek() {
                     chars.next();
@@ -94,6 +141,7 @@ pub fn tokenize(source_code: &str) -> Vec<Token> {
                     tokens.push(Token::Operator(Operator::LessThan));
                 }
             },
+
             '>' => {
                 if let Some('>') = chars.peek() {
                     chars.next();
@@ -105,6 +153,7 @@ pub fn tokenize(source_code: &str) -> Vec<Token> {
                     tokens.push(Token::Operator(Operator::GreaterThan));
                 }
             },
+
             '=' => {
                 if let Some('=') = chars.peek() {
                     chars.next();
@@ -113,6 +162,7 @@ pub fn tokenize(source_code: &str) -> Vec<Token> {
                     tokens.push(Token::Assign);
                 }
             },
+
             '?' => tokens.push(Token::TernaryCondition),
 
             '\'' => read_char_literal(&mut chars, &mut tokens),
