@@ -1,15 +1,10 @@
-use std::fs::read_to_string;
+mod test_utils;
+
+use test_utils::read_file;
 
 use sheeppig::elements::{Identifier, Literal, Operator, Keyword};
 use sheeppig::tokens::Token;
 use sheeppig::lexer::tokenize;
-
-
-fn read_file(file_path: &str) -> String {
-    let input = read_to_string(file_path)
-        .expect("Failed to read input file");
-    input
-}
 
 
 #[test]
@@ -20,7 +15,7 @@ fn test_tokenise_hello_world() {
 
     let expected = vec![
         Token::Keyword(Keyword::Function),
-        Token::Identifier(Identifier::Simple("hello_world".to_string())),
+        Token::Identifier(Identifier::Simple("main".to_string())),
         Token::OpenParen,
         Token::CloseParen,
         Token::OpenBrace,
@@ -250,8 +245,7 @@ fn test_tokenise_arithmetic() {
         Token::Newline,
 
         Token::Identifier(Identifier::Simple("b".to_string())),
-        Token::Operator(Operator::Plus),
-        Token::Assign,
+        Token::BinaryAssign(Operator::Plus),
         Token::Literal(Literal::Integer(7)),
         Token::Newline,
 
@@ -350,12 +344,17 @@ fn test_tokenise_comments() {
         Token::CloseParen,
         Token::OpenBrace,
 
+        Token::Keyword(Keyword::Variable),
         Token::Identifier(Identifier::Simple("a".to_string())),
+        Token::Colon,
+        Token::Identifier(Identifier::Simple("int".to_string())),
         Token::Assign,
         Token::Literal(Literal::Integer(1)),
         Token::Newline,
 
         Token::Identifier(Identifier::Simple("b".to_string())),
+        Token::Colon,
+        Token::Identifier(Identifier::Simple("int".to_string())),
         Token::Assign,
         Token::Literal(Literal::Integer(1)),
         Token::Operator(Operator::Plus),
@@ -363,6 +362,8 @@ fn test_tokenise_comments() {
         Token::Newline,
 
         Token::Identifier(Identifier::Simple("c".to_string())),
+        Token::Colon,
+        Token::Identifier(Identifier::Simple("int".to_string())),
         Token::Assign,
         Token::Literal(Literal::Integer(3)),
         Token::Newline,
