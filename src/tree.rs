@@ -1,21 +1,21 @@
 
 use crate::elements::{Identifier, Literal, Operator};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub name: Identifier,
     pub imports: Vec<Import>,
     pub functions: Vec<Function>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Import {
     pub name: Identifier,
     pub alias: Identifier,
     pub source: Identifier,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: Identifier,
     pub parameters: Vec<Parameter>,
@@ -23,21 +23,20 @@ pub struct Function {
     pub body: Box<StatementBlock>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     pub name: Identifier,
     pub param_type: Identifier,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StatementBlock {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
-    VarDeclaration(VarDeclarationStatement),
-    ConstDeclaration(ConstDeclarationStatement),
+    Declaration(DeclarationStatement),
     Assignment(AssignmentStatement),
     Expression(Expression),
     Return(ReturnStatement),
@@ -46,45 +45,39 @@ pub enum Statement {
     Loop(LoopStatement),
 }
 
-#[derive(Debug, PartialEq)]
-pub struct VarDeclarationStatement {
+#[derive(Debug, Clone, PartialEq)]
+pub struct DeclarationStatement {
     pub name: Identifier,
     pub var_type: Identifier,
     pub value: Expression,
+    pub is_mutable: bool,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct ConstDeclarationStatement {
-    pub name: Identifier,
-    pub const_type: Identifier,
-    pub value: Expression,
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AssignmentStatement {
-    pub name: Identifier,
+    pub reference: Reference,
     pub value: Expression,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReturnStatement {
     pub value: Expression,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConditionalStatement {
     pub condition: Expression,
     pub body: Box<StatementBlock>,
     pub else_body: Option<Box<StatementBlock>>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LoopStatement {
     pub condition: Expression,
     pub body: Box<StatementBlock>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     TernaryCondition {
         condition: Box<Expression>,
@@ -103,23 +96,57 @@ pub enum Expression {
     Atomic(AtomicExpression),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, )]
 pub enum AtomicExpression {
     Literal(Literal),
     Identifier(Identifier),
     FunctionCall(FunctionCallExpression),
     Parenthesized(ParenthesizedExpression),
+    ArrayLiteral(ArrayLiteralExpression),
+    ArrayIndex(ArrayIndexExpression),
 }
 
-#[derive(Debug, PartialEq)]
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionCallExpression {
     pub name: Identifier,
     pub parameters: Vec<Expression>,
 }
 
 
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParenthesizedExpression {
     pub value: Box<Expression>,
+}
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArrayLiteralExpression {
+    pub values: Vec<Expression>,
+}
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArrayIndexExpression {
+    pub array: Box<AtomicExpression>,
+    pub index: ArrayIndex,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArrayIndex {
+    Single(Box<Expression>),
+    Slice {
+        start: Option<Box<Expression>>,
+        end: Option<Box<Expression>>,
+    },
+}
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Reference {
+    Identifier(Identifier),
+    ArrayReference{
+        array: Box<Reference>,
+        index: ArrayIndex,
+    },
 }

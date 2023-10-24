@@ -34,7 +34,7 @@ pub fn parse_atomic(tokens: &mut Peekable<Iter<Token>>) -> Expression {
 
         // TODO: Array literals
 
-        token => handle_parse_error_for_option("Expected a literal", token),
+        token => handle_parse_error_for_option("Expected an atomic expression.", token),
     };
     Expression::Atomic(atom)
 }
