@@ -1,20 +1,35 @@
-use core::panic;
 use std::iter::Peekable;
 use std::slice::Iter;
 
-use crate::elements::{Identifier, Literal, Operator, Keyword};
+use crate::elements::Operator;
 use crate::tokens::Token;
-use crate::tree::{
-    StatementBlock, Statement,
-    Expression, AtomicExpression, ParenthesizedExpression, FunctionCallExpression
-};
+use crate::tree::Expression;
 
 use crate::parser::utils::{handle_parse_error, handle_parse_error_for_option};
 use crate::parser::atomic_parser::parse_atomic;
 
 
+const NUM_PRECEDENCE_LEVELS: usize = 12;
+const PRECEDENCE_TABLE: [&[Operator]; NUM_PRECEDENCE_LEVELS] = [
+    &[Operator::Power],
+    &[], // Unary operators
+    &[Operator::Times, Operator::Divide, Operator::Modulo],
+    &[Operator::Plus, Operator::Minus],
+    &[Operator::BitwiseLeftShift, Operator::BitwiseRightShift],
+    &[Operator::LessThan, Operator::LessThanOrEqual, Operator::GreaterThan, Operator::GreaterThanOrEqual],
+    &[Operator::Equal, Operator::NotEqual],
+    &[Operator::BitwiseAnd],
+    &[Operator::BitwiseXor],
+    &[Operator::BitwiseOr],
+    &[Operator::And],
+    &[Operator::Or],
+];
+
+
 pub fn parse_expression(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    let left = parse_logical_or(tokens);
+    // let left = parse_logical_or(tokens);
+    let left = parse_binary_expression_with_precedence(tokens, NUM_PRECEDENCE_LEVELS-1);
+
     match tokens.peek() {
         Some(Token::TernaryCondition) => {
             tokens.next();
@@ -35,12 +50,41 @@ pub fn parse_expression(tokens: &mut Peekable<Iter<Token>>) -> Expression {
 }
 
 
-fn parse_binary_operation(
+fn parse_binary_expression_with_precedence(tokens: &mut Peekable<Iter<Token>>, precedence: usize) -> Expression {
+    if precedence >= NUM_PRECEDENCE_LEVELS {
+        panic!("Invalid precedence level: {}", precedence)
+    }
+
+    let operators = PRECEDENCE_TABLE[precedence];
+
+    match precedence {
+        0 => parse_binary_operation(tokens,
+            |tokens| parse_atomic(tokens),
+            |tokens| parse_binary_expression_with_precedence(tokens, precedence),
+            operators
+        ),
+
+        1 => parse_unary(tokens),
+
+        _ => parse_binary_operation(tokens,
+            |tokens| parse_binary_expression_with_precedence(tokens, precedence - 1),
+            |tokens| parse_binary_expression_with_precedence(tokens, precedence),
+            operators
+        )
+    }
+}
+
+
+fn parse_binary_operation<F, G>(
     tokens: &mut Peekable<Iter<Token>>,
-    parse_left: fn(&mut Peekable<Iter<Token>>) -> Expression,
-    parse_right: fn(&mut Peekable<Iter<Token>>) -> Expression,
+    parse_left: F,
+    parse_right: G,
     operators: &[Operator],
-) -> Expression {
+) -> Expression
+where
+    F: Fn(&mut Peekable<Iter<Token>>) -> Expression,
+    G: Fn(&mut Peekable<Iter<Token>>) -> Expression,
+{
     let left = parse_left(tokens);
     match tokens.peek() {
         Some(Token::Operator(operator)) => {
@@ -60,96 +104,6 @@ fn parse_binary_operation(
 }
 
 
-fn parse_logical_or(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_logical_and,
-        parse_logical_or,
-        &[Operator::Or]
-    )
-}
-
-
-fn parse_logical_and(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_bitwise_or,
-        parse_logical_and,
-        &[Operator::And]
-    )
-}
-
-fn parse_bitwise_or(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_bitwise_xor,
-        parse_bitwise_or,
-        &[Operator::BitwiseOr]
-    )
-}
-
-
-fn parse_bitwise_xor(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_bitwise_and,
-        parse_bitwise_xor,
-        &[Operator::BitwiseXor]
-    )
-}
-
-
-fn parse_bitwise_and(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_equality,
-        parse_bitwise_and,
-        &[Operator::BitwiseAnd]
-    )
-}
-
-
-fn parse_equality(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_relation,
-        parse_equality,
-        &[Operator::Equal, Operator::NotEqual]
-    )
-}
-
-
-fn parse_relation(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_shift,
-        parse_relation,
-        &[Operator::LessThan, Operator::LessThanOrEqual, Operator::GreaterThan, Operator::GreaterThanOrEqual]
-    )
-}
-
-
-fn parse_shift(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_sum,
-        parse_shift,
-        &[Operator::BitwiseLeftShift, Operator::BitwiseRightShift]
-    )
-}
-
-
-fn parse_sum(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_factor,
-        parse_sum,
-        &[Operator::Plus, Operator::Minus]
-    )
-}
-
-
-fn parse_factor(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_power,
-        parse_factor,
-        &[Operator::Times, Operator::Divide, Operator::Modulo]
-    )
-}
-
-
-
 fn parse_unary(tokens: &mut Peekable<Iter<Token>>) -> Expression {
     match tokens.peek() {
         Some(token @ Token::Operator(operator)) => match operator {
@@ -162,22 +116,17 @@ fn parse_unary(tokens: &mut Peekable<Iter<Token>>) -> Expression {
             }
             _ => handle_parse_error("Operator not allowed in unary expression", token),
         },
-        _ => parse_power(tokens),
+        _ => parse_binary_expression_with_precedence(tokens, 0),
     }
 }
 
 
-fn parse_power(tokens: &mut Peekable<Iter<Token>>) -> Expression {
-    parse_binary_operation(tokens,
-        parse_atomic,
-        parse_power,
-        &[Operator::Power]
-    )
-}
-
 
 #[cfg(test)]
 mod test {
+    use crate::elements::Literal;
+    use crate::tree::AtomicExpression;
+
     use super::*;
 
     #[test]
@@ -188,7 +137,8 @@ mod test {
             Token::Literal(Literal::Integer(2)),
             Token::Operator(Operator::Plus),
         ];
-        let iter_tokens = &mut tokens.iter().peekable();
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 0);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(1)))),
@@ -196,8 +146,8 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(2)))),
         };
 
-        assert_eq!(parse_power(iter_tokens), expected);
-        assert_eq!(Token::Operator(Operator::Plus), *iter_tokens.next().unwrap());
+        assert_eq!(result, expected);
+        assert_eq!(Token::Operator(Operator::Plus), *tokens.next().unwrap());
     }
 
     #[test]
@@ -208,15 +158,16 @@ mod test {
             Token::Operator(Operator::Plus),
             Token::Literal(Literal::Integer(2)),
         ];
-        let iter_tokens = &mut tokens.iter().peekable();
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 1);
 
         let expected = Expression::UnaryOperation {
             operator: Operator::Minus,
             operand: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(1)))),
         };
 
-        assert_eq!(parse_unary(iter_tokens), expected);
-        assert_eq!(Token::Operator(Operator::Plus), *iter_tokens.next().unwrap());
+        assert_eq!(result, expected);
+        assert_eq!(Token::Operator(Operator::Plus), *tokens.next().unwrap());
     }
 
     #[test]
@@ -226,12 +177,13 @@ mod test {
             Token::Operator(Operator::Plus),
             Token::Literal(Literal::Integer(2)),
         ];
-        let iter_tokens = &mut tokens.iter().peekable();
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 1);
 
         let expected = Expression::Atomic(AtomicExpression::Literal(Literal::Integer(1)));
 
-        assert_eq!(parse_unary(iter_tokens), expected);
-        assert_eq!(Token::Operator(Operator::Plus), *iter_tokens.next().unwrap());
+        assert_eq!(result, expected);
+        assert_eq!(Token::Operator(Operator::Plus), *tokens.next().unwrap());
     }
 
     #[test]
@@ -242,6 +194,8 @@ mod test {
             Token::Operator(Operator::Power),
             Token::Literal(Literal::Integer(2)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 1);
 
         let expected = Expression::UnaryOperation {
             operator: Operator::Minus,
@@ -252,7 +206,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_unary(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -261,8 +215,9 @@ mod test {
             Token::Literal(Literal::Integer(3)),
             Token::Operator(Operator::Times),
             Token::Literal(Literal::Integer(4)),
-
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 2);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -270,7 +225,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_factor(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -282,6 +237,8 @@ mod test {
             Token::Operator(Operator::Power),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 2);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -293,7 +250,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_factor(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -305,6 +262,8 @@ mod test {
             Token::Operator(Operator::Times),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 2);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -316,7 +275,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_factor(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -326,6 +285,8 @@ mod test {
             Token::Operator(Operator::Plus),
             Token::Literal(Literal::Integer(4)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 3);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -333,7 +294,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_sum(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -345,6 +306,8 @@ mod test {
             Token::Operator(Operator::Times),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 3);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -356,7 +319,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_sum(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -368,6 +331,8 @@ mod test {
             Token::Operator(Operator::Plus),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 3);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -379,7 +344,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_sum(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -389,6 +354,8 @@ mod test {
             Token::Operator(Operator::BitwiseLeftShift),
             Token::Literal(Literal::Integer(4)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 4);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -396,7 +363,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_shift(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -408,6 +375,8 @@ mod test {
             Token::Operator(Operator::Plus),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 4);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -419,7 +388,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_shift(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -431,6 +400,8 @@ mod test {
             Token::Operator(Operator::BitwiseLeftShift),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 4);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -442,7 +413,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_shift(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
 
@@ -453,6 +424,8 @@ mod test {
             Token::Operator(Operator::LessThan),
             Token::Literal(Literal::Integer(4)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 5);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -460,7 +433,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_relation(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -472,6 +445,8 @@ mod test {
             Token::Operator(Operator::BitwiseLeftShift),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 5);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -483,7 +458,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_relation(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -495,6 +470,8 @@ mod test {
             Token::Operator(Operator::LessThan),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 5);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -506,7 +483,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_relation(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -516,6 +493,8 @@ mod test {
             Token::Operator(Operator::Equal),
             Token::Literal(Literal::Integer(4)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 6);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -523,7 +502,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_equality(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -535,6 +514,8 @@ mod test {
             Token::Operator(Operator::LessThan),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 6);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -546,7 +527,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_equality(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -558,6 +539,8 @@ mod test {
             Token::Operator(Operator::Equal),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 6);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -569,7 +552,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_equality(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -579,6 +562,8 @@ mod test {
             Token::Operator(Operator::BitwiseAnd),
             Token::Literal(Literal::Integer(4)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 7);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -586,7 +571,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_bitwise_and(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -598,6 +583,8 @@ mod test {
             Token::Operator(Operator::Equal),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 7);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -609,7 +596,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_bitwise_and(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -621,6 +608,8 @@ mod test {
             Token::Operator(Operator::BitwiseAnd),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 7);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -632,7 +621,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_bitwise_and(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -642,6 +631,8 @@ mod test {
             Token::Operator(Operator::BitwiseXor),
             Token::Literal(Literal::Integer(4)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 8);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -649,7 +640,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_bitwise_xor(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -661,6 +652,8 @@ mod test {
             Token::Operator(Operator::BitwiseAnd),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 8);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -672,7 +665,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_bitwise_xor(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -684,6 +677,8 @@ mod test {
             Token::Operator(Operator::BitwiseXor),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 8);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -695,7 +690,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_bitwise_xor(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -705,6 +700,8 @@ mod test {
             Token::Operator(Operator::BitwiseOr),
             Token::Literal(Literal::Integer(4)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 9);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -712,7 +709,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_bitwise_or(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -724,6 +721,8 @@ mod test {
             Token::Operator(Operator::BitwiseXor),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 9);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -735,7 +734,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_bitwise_or(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -747,6 +746,8 @@ mod test {
             Token::Operator(Operator::BitwiseOr),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 9);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -758,7 +759,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_bitwise_or(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -768,6 +769,8 @@ mod test {
             Token::Operator(Operator::And),
             Token::Literal(Literal::Integer(4)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 10);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -775,7 +778,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_logical_and(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -787,6 +790,8 @@ mod test {
             Token::Operator(Operator::BitwiseOr),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 10);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -798,7 +803,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_logical_and(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -810,6 +815,8 @@ mod test {
             Token::Operator(Operator::And),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 10);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -821,7 +828,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_logical_and(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -831,6 +838,8 @@ mod test {
             Token::Operator(Operator::Or),
             Token::Literal(Literal::Integer(4)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 11);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -838,7 +847,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(4)))),
         };
 
-        assert_eq!(parse_logical_or(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -850,6 +859,8 @@ mod test {
             Token::Operator(Operator::And),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 11);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(3)))),
@@ -861,7 +872,7 @@ mod test {
             }),
         };
 
-        assert_eq!(parse_logical_or(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -873,6 +884,8 @@ mod test {
             Token::Operator(Operator::Or),
             Token::Literal(Literal::Integer(5)),
         ];
+        let tokens = &mut tokens.iter().peekable();
+        let result = parse_binary_expression_with_precedence(tokens, 11);
 
         let expected = Expression::BinaryOperation {
             left: Box::new(Expression::BinaryOperation {
@@ -884,7 +897,7 @@ mod test {
             right: Box::new(Expression::Atomic(AtomicExpression::Literal(Literal::Integer(5)))),
         };
 
-        assert_eq!(parse_logical_or(&mut tokens.iter().peekable()), expected);
+        assert_eq!(result, expected);
     }
 
     #[test]
