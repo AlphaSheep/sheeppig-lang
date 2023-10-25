@@ -1,4 +1,3 @@
-use core::panic;
 use std::iter::Peekable;
 use std::slice::Iter;
 
@@ -6,7 +5,7 @@ use crate::elements::{ Identifier, Literal, Operator, Keyword };
 use crate::tokens::Token;
 use crate::tree::{
     StatementBlock, Statement,
-    Expression, AtomicExpression, AssignmentStatement, Reference, DeclarationStatement,
+    Expression, AtomicExpression, AssignmentStatement, Reference, DeclarationStatement, ConditionalStatement, LoopStatement,
 };
 
 use crate::parser::utils::{ handle_parse_error, handle_parse_error_for_option, handle_expression_parse_error };
@@ -26,9 +25,9 @@ pub fn parse_statement_block(tokens: &mut Peekable<Iter<Token>>) -> StatementBlo
 
             Token::CloseBrace => { tokens.next(); break },
 
-            // TODO: If statement
+            Token::Keyword(Keyword::If) => statements.push(parse_if_statement(tokens)),
 
-            // TODO: While statement
+            Token::Keyword(Keyword::While) => statements.push(parse_while_statement(tokens)),
 
             _ => statements.push(parse_statement(tokens)),
         }
@@ -37,6 +36,45 @@ pub fn parse_statement_block(tokens: &mut Peekable<Iter<Token>>) -> StatementBlo
     StatementBlock {
         statements,
     }
+}
+
+
+fn parse_if_statement(tokens: &mut Peekable<Iter<Token>>) -> Statement {
+    if tokens.next() != Some(&Token::Keyword(Keyword::If)) {
+        handle_parse_error_for_option::<()>("Expected if keyword", tokens.peek());
+    }
+
+    let condition = parse_expression(tokens);
+    println!("Condition: {:?}", condition);
+    let body = parse_statement_block(tokens);
+
+    let else_body = if let Some(Token::Keyword(Keyword::Else)) = tokens.peek() {
+        tokens.next();
+        Some(Box::new(parse_statement_block(tokens)))
+    } else {
+        None
+    };
+
+    Statement::Conditional(ConditionalStatement {
+        condition,
+        body: Box::new(body),
+        else_body,
+    })
+}
+
+
+fn parse_while_statement(tokens: &mut Peekable<Iter<Token>>) -> Statement {
+    if tokens.next() != Some(&Token::Keyword(Keyword::While)) {
+        handle_parse_error_for_option::<()>("Expected while keyword", tokens.peek());
+    }
+
+    let condition = parse_expression(tokens);
+    let body = parse_statement_block(tokens);
+
+    Statement::Loop(LoopStatement {
+        condition,
+        body: Box::new(body),
+    })
 }
 
 
@@ -51,6 +89,8 @@ pub fn parse_statement(all_tokens: &mut Peekable<Iter<Token>>) -> Statement {
         },
         _ => false,
     };
+
+    println!("Tokens: {:?}", tokens_vec);
 
     let mut left = parse_expression(tokens);
 
@@ -90,10 +130,22 @@ pub fn parse_statement(all_tokens: &mut Peekable<Iter<Token>>) -> Statement {
 fn consume_statement_tokens(tokens: &mut Peekable<Iter<Token>>) -> Vec<Token> {
     let mut statement_tokens = vec![];
 
-    while let Some(token) = tokens.next() {
+    while let Some(token) = tokens.peek() {
         match token {
-            Token::Newline => break,
-            _ => statement_tokens.push(token.clone()),
+            Token::CloseBrace => break,  // Don't consume a closing brace
+
+            Token::Newline => {
+                tokens.next();  // New line is consumed
+                break
+            },
+
+            _ => {
+                let next = tokens.next();
+                match next {
+                    Some(token) => statement_tokens.push(token.clone()),
+                    None => handle_parse_error_for_option("Expected a token", next),
+                }
+            }
         }
     }
 
@@ -423,6 +475,102 @@ mod test {
                 var_type: Identifier::Simple("type".to_string()),
                 value: Expression::Atomic(AtomicExpression::Literal(Literal::Integer(1))),
                 is_mutable: false,
+            }
+        );
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_while_loop() {
+        let tokens = vec![
+            Token::Keyword(Keyword::While),
+            Token::Literal(Literal::Boolean(true)),
+            Token::OpenBrace,
+            Token::Literal(Literal::Integer(1)),
+            Token::CloseBrace,
+        ];
+        let mut tokens = tokens.iter().peekable();
+        let result = parse_while_statement(&mut tokens);
+
+        let expected = Statement::Loop(
+            LoopStatement {
+                condition: Expression::Atomic(AtomicExpression::Literal(Literal::Boolean(true))),
+                body: Box::new(StatementBlock {
+                    statements: vec![
+                        Statement::Expression(
+                            Expression::Atomic(AtomicExpression::Literal(Literal::Integer(1)))
+                        )
+                    ],
+                }),
+            }
+        );
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_if_statement() {
+        let tokens = vec![
+            Token::Keyword(Keyword::If),
+            Token::Literal(Literal::Boolean(true)),
+            Token::OpenBrace,
+            Token::Literal(Literal::Integer(1)),
+            Token::CloseBrace,
+        ];
+        let mut tokens = tokens.iter().peekable();
+        let result = parse_if_statement(&mut tokens);
+
+        let expected = Statement::Conditional(
+            ConditionalStatement {
+                condition: Expression::Atomic(AtomicExpression::Literal(Literal::Boolean(true))),
+                body: Box::new(StatementBlock {
+                    statements: vec![
+                        Statement::Expression(
+                            Expression::Atomic(AtomicExpression::Literal(Literal::Integer(1)))
+                        )
+                    ],
+                }),
+                else_body: None,
+            }
+        );
+
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_if_statement_with_else_block() {
+        let tokens = vec![
+            Token::Keyword(Keyword::If),
+            Token::Literal(Literal::Boolean(true)),
+            Token::OpenBrace,
+            Token::Literal(Literal::Integer(1)),
+            Token::CloseBrace,
+            Token::Keyword(Keyword::Else),
+            Token::OpenBrace,
+            Token::Literal(Literal::Integer(2)),
+            Token::CloseBrace,
+        ];
+        let mut tokens = tokens.iter().peekable();
+        let result = parse_if_statement(&mut tokens);
+
+        let expected = Statement::Conditional(
+            ConditionalStatement {
+                condition: Expression::Atomic(AtomicExpression::Literal(Literal::Boolean(true))),
+                body: Box::new(StatementBlock {
+                    statements: vec![
+                        Statement::Expression(
+                            Expression::Atomic(AtomicExpression::Literal(Literal::Integer(1)))
+                        )
+                    ],
+                }),
+                else_body: Some(Box::new(StatementBlock {
+                    statements: vec![
+                        Statement::Expression(
+                            Expression::Atomic(AtomicExpression::Literal(Literal::Integer(2)))
+                        )
+                    ],
+                })),
             }
         );
 
