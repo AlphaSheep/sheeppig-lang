@@ -2,7 +2,7 @@ use std::io::{stdin, stdout, Write};
 
 
 use sheeppig::lexer::tokenize;
-use sheeppig::parser::statement_parser::parse_statement;
+use sheeppig::parser::parse;
 
 
 pub fn repl() {
@@ -25,8 +25,7 @@ pub fn repl() {
         let tokens = tokenize(&buffer);
         println!("\n -- Tokens: {:?} \n", tokens);
 
-        let mut tokens = tokens.iter().peekable();
-        let expression = parse_statement(&mut tokens);
+        let expression = parse(&tokens);
         println!("\n -- Expression: {:?} \n", expression);
     }
 }

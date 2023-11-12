@@ -4,7 +4,7 @@ use std::slice::Iter;
 use crate::elements::Identifier;
 use crate::tokens::Token;
 use crate::tree;
-use crate::parser::statement_parser::parse_statement_block;
+use crate::parser::statement_parser::parse_statement_block_between_braces;
 
 use crate::parser::utils::{handle_parse_error, handle_parse_error_for_option};
 
@@ -13,7 +13,7 @@ pub fn parse_function_block(tokens: &mut Peekable<Iter<Token>>) -> tree::Functio
     let name = parse_function_name(tokens);
     let parameters = parse_parameter_list(tokens);
     let return_type = parse_function_return_type(tokens);
-    let body = parse_statement_block(tokens);
+    let body = parse_statement_block_between_braces(tokens);
 
     tree::Function {
         name,

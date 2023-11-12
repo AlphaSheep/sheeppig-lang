@@ -6,6 +6,7 @@ pub struct Module {
     pub name: Identifier,
     pub imports: Vec<Import>,
     pub functions: Vec<Function>,
+    pub statements: StatementBlock,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,6 +33,12 @@ pub struct Parameter {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StatementBlock {
     pub statements: Vec<Statement>,
+}
+
+impl StatementBlock {
+    pub fn empty() -> StatementBlock {
+        StatementBlock{ statements: vec![] }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

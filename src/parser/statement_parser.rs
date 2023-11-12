@@ -8,13 +8,27 @@ use crate::tree::{
     Expression, AtomicExpression, AssignmentStatement, Reference, DeclarationStatement, ConditionalStatement, LoopStatement,
 };
 
-use crate::parser::utils::{ handle_parse_error, handle_parse_error_for_option, handle_expression_parse_error };
+use crate::parser::utils::{ handle_parse_error_for_option, handle_expression_parse_error };
 use crate::parser::expression_parser::parse_expression;
 
 
-pub fn parse_statement_block(tokens: &mut Peekable<Iter<Token>>) -> StatementBlock {
+pub fn parse_statements_until_end_of_module(tokens: &mut Peekable<Iter<Token>>) -> StatementBlock {
+    parse_statement_block(tokens, Token::EndOfModule)
+}
+
+
+pub fn parse_statement_block_between_braces(tokens: &mut Peekable<Iter<Token>>) -> StatementBlock {
     if tokens.next() != Some(&Token::OpenBrace) {
-        handle_parse_error_for_option::<()>("Expected open brace after function signature, found {:?}", tokens.peek());
+        handle_parse_error_for_option::<()>("Expected a statement block starting with open brace, found {:?}", tokens.peek());
+    }
+    parse_statement_block(tokens, Token::CloseBrace)
+}
+
+
+fn parse_statement_block(tokens: &mut Peekable<Iter<Token>>, end: Token) -> StatementBlock {
+    match end {
+        Token::CloseBrace | Token::EndOfModule => {},
+        _ => panic!("This should not happen. A statement block should always be enclosed with braces or be at the top level of a module.")
     }
 
     let mut statements = vec![];
@@ -23,7 +37,20 @@ pub fn parse_statement_block(tokens: &mut Peekable<Iter<Token>>) -> StatementBlo
         match token {
             Token::Newline => { tokens.next(); },
 
-            Token::CloseBrace => { tokens.next(); break },
+            Token::CloseBrace => {
+                if end == Token::CloseBrace {
+                    tokens.next(); break
+                } else {
+                    handle_parse_error_for_option::<()>("Unexpected closing brace", tokens.peek());
+                }
+            },
+            Token::EndOfModule => {
+                if end == Token::EndOfModule {
+                    break
+                } else {
+                    handle_parse_error_for_option::<()>("Unexpected end of module", tokens.peek());
+                }
+            },
 
             Token::Keyword(Keyword::If) => statements.push(parse_if_statement(tokens)),
 
@@ -46,11 +73,11 @@ fn parse_if_statement(tokens: &mut Peekable<Iter<Token>>) -> Statement {
 
     let condition = parse_expression(tokens);
     println!("Condition: {:?}", condition);
-    let body = parse_statement_block(tokens);
+    let body = parse_statement_block_between_braces(tokens);
 
     let else_body = if let Some(Token::Keyword(Keyword::Else)) = tokens.peek() {
         tokens.next();
-        Some(Box::new(parse_statement_block(tokens)))
+        Some(Box::new(parse_statement_block_between_braces(tokens)))
     } else {
         None
     };
@@ -69,7 +96,7 @@ fn parse_while_statement(tokens: &mut Peekable<Iter<Token>>) -> Statement {
     }
 
     let condition = parse_expression(tokens);
-    let body = parse_statement_block(tokens);
+    let body = parse_statement_block_between_braces(tokens);
 
     Statement::Loop(LoopStatement {
         condition,
@@ -220,7 +247,7 @@ mod test {
         ];
         let mut tokens = tokens.iter().peekable();
 
-        let result = parse_statement_block(&mut tokens);
+        let result = parse_statement_block_between_braces(&mut tokens);
 
         let expected = StatementBlock {
             statements: vec![],
@@ -238,7 +265,7 @@ mod test {
         ];
         let mut tokens = tokens.iter().peekable();
 
-        let result = parse_statement_block(&mut tokens);
+        let result = parse_statement_block_between_braces(&mut tokens);
 
         let expected = StatementBlock {
             statements: vec![],
@@ -259,7 +286,7 @@ mod test {
         ];
         let mut tokens = tokens.iter().peekable();
 
-        let result = parse_statement_block(&mut tokens);
+        let result = parse_statement_block_between_braces(&mut tokens);
 
         let expected = StatementBlock {
             statements: vec![
@@ -291,7 +318,7 @@ mod test {
         ];
         let mut tokens = tokens.iter().peekable();
 
-        let result = parse_statement_block(&mut tokens);
+        let result = parse_statement_block_between_braces(&mut tokens);
 
         let expected = StatementBlock {
             statements: vec![

@@ -46,7 +46,8 @@ fn test_parse_hello_world() {
                 return_type: None,
                 body: func_body,
             }
-        ]
+        ],
+        statements: StatementBlock::empty(),
     };
 
     assert_eq!(tree, expected);
@@ -108,7 +109,8 @@ fn test_parse_comments() {
                 return_type: None,
                 body: func_body,
             }
-        ]
+        ],
+        statements: StatementBlock::empty(),
     };
 
     assert_eq!(tree, expected);
