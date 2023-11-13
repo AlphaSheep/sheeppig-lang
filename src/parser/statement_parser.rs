@@ -5,7 +5,7 @@ use crate::elements::{ Identifier, Literal, Operator, Keyword };
 use crate::tokens::Token;
 use crate::tree::{
     StatementBlock, Statement,
-    Expression, AtomicExpression, AssignmentStatement, Reference, DeclarationStatement, ConditionalStatement, LoopStatement,
+    Expression, AtomicExpression, AssignmentStatement, Reference, DeclarationStatement, ConditionalStatement, LoopStatement, ReturnStatement,
 };
 
 use crate::parser::utils::{ handle_parse_error_for_option, handle_expression_parse_error };
@@ -109,6 +109,10 @@ pub fn parse_statement(all_tokens: &mut Peekable<Iter<Token>>) -> Statement {
     let tokens_vec = consume_statement_tokens(all_tokens);
     let tokens = &mut tokens_vec.iter().peekable();
 
+    if tokens.peek() == Some(&&Token::Keyword(Keyword::Return)) {
+        return parse_return_statement(tokens);
+    }
+
     let is_variable = match tokens.peek() {
         Some(Token::Keyword(Keyword::Variable)) => {
             tokens.next();
@@ -116,8 +120,6 @@ pub fn parse_statement(all_tokens: &mut Peekable<Iter<Token>>) -> Statement {
         },
         _ => false,
     };
-
-    println!("Tokens: {:?}", tokens_vec);
 
     let mut left = parse_expression(tokens);
 
@@ -151,6 +153,18 @@ pub fn parse_statement(all_tokens: &mut Peekable<Iter<Token>>) -> Statement {
             handle_parse_error_for_option("Unrecognised token in statement", token)
         },
     }
+}
+
+
+fn parse_return_statement(tokens: &mut Peekable<Iter<Token>>) -> Statement {
+    if tokens.next() != Some(&Token::Keyword(Keyword::Return)) {
+        handle_parse_error_for_option::<()>("Expected return keyword", tokens.peek());
+    }
+
+    let value = parse_expression(tokens);
+    Statement::Return(ReturnStatement {
+        value,
+    })
 }
 
 
